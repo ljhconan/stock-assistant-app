@@ -15,23 +15,11 @@
 </head>
 <body>
 
-<div id="lock" class="lock">
-  <form id="lock-form" autocomplete="on">
-    <div class="eyebrow">个人持仓 · 加密数据</div>
-    <h1>股票助手</h1>
-    <label for="pass">输入密码解锁</label>
-    <input id="pass" name="password" type="password" autocomplete="current-password" required>
-    <label class="remember"><input id="remember" type="checkbox" checked> 在这台设备上记住</label>
-    <button class="go" type="submit">解锁</button>
-    <p class="err" id="lock-err" role="alert"></p>
-  </form>
-</div>
-
-<div id="app" hidden>
+<div id="app">
   <div class="app">
     <header class="top">
       <div><div class="eyebrow" id="asof"></div><h1 id="title">今日</h1></div>
-      <div class="src">数据来源 Robinhood<br><button class="topbtn" id="lock-btn" type="button">锁定</button></div>
+      <div class="src">数据来源<br>Robinhood</div>
     </header>
     <main id="view" class="stack" aria-live="polite"></main>
   </div>

@@ -1,4 +1,4 @@
-/* 股票助手：读取加密的 data.enc.json，用密码在浏览器里解密后显示。
+/* 股票助手：读取 data.json 并显示。
    数据由云端定时任务每天更新并推送到仓库，Vercel 自动重新部署。 */
 
 /* ===== 每类股票该看什么（固定说明） ===== */
@@ -27,17 +27,11 @@ const store = { get(k){ try { return localStorage.getItem(k); } catch { return n
 
 let D = null, ROWS = [], BY = {};
 
-/* ===== 解密 ===== */
-const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
-async function decrypt(pass){
-  const r = await fetch('data.enc.json?t=' + Date.now(), { cache: 'no-store' });
+/* ===== 读取数据 ===== */
+async function fetchData(){
+  const r = await fetch('data.json?t=' + Date.now(), { cache: 'no-store' });
   if (!r.ok) throw new Error('fetch');
-  const e = await r.json();
-  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
-  const key = await crypto.subtle.deriveKey({ name:'PBKDF2', salt: unb64(e.salt), iterations: e.iter, hash:'SHA-256' },
-    base, { name:'AES-GCM', length:256 }, false, ['decrypt']);
-  const pt = await crypto.subtle.decrypt({ name:'AES-GCM', iv: unb64(e.iv) }, key, unb64(e.ct));
-  return JSON.parse(new TextDecoder().decode(pt));
+  return r.json();
 }
 
 function load(data){
@@ -46,7 +40,6 @@ function load(data){
     day:(r[4]/r[5]-1)*100, pnl:(r[4]/r[3]-1)*100, ahc:(r[6]/r[4]-1)*100})).sort((a,b) => a.day - b.day);
   BY = Object.fromEntries(ROWS.map(x => [x.t, x]));
   $('#asof').textContent = D.asOfLabel;
-  $('#lock').hidden = true; $('#app').hidden = false;
   render();
 }
 
@@ -202,27 +195,12 @@ document.addEventListener('click', e => {
   const tb = e.target.closest('.tab'); if (tb) { location.hash = tb.dataset.tab; window.scrollTo(0,0); return; }
   if (e.target.closest('#close')) { closeDetail(); return; }
   if (e.target.closest('#quiet-toggle')) { quietOpen = !quietOpen; render(); $('#quiet-toggle').focus(); return; }
-  if (e.target.closest('#lock-btn')) { store.del('sa-pass'); location.reload(); return; }
   const pb = e.target.closest('[data-period]'); if (pb) { period = +pb.dataset.period; render(); const b = document.querySelector(`[data-period="${period}"]`); if (b) b.focus(); }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#sheet').hidden) closeDetail(); });
 window.addEventListener('hashchange', render);
 
-$('#lock-form').addEventListener('submit', async e => {
-  e.preventDefault();
-  const pass = $('#pass').value; $('#lock-err').textContent = '解锁中…';
-  try {
-    const data = await decrypt(pass);
-    if ($('#remember').checked) store.set('sa-pass', pass);
-    $('#lock-err').textContent = '';
-    load(data);
-  } catch (err) {
-    $('#lock-err').textContent = err.message === 'fetch' ? '数据文件读取失败，请稍后刷新。' : '密码不对，请再试一次。';
-  }
-});
-
 (async () => {
-  const saved = store.get('sa-pass');
-  if (saved) { try { load(await decrypt(saved)); return; } catch { store.del('sa-pass'); } }
-  $('#pass').focus();
+  try { load(await fetchData()); }
+  catch { $('#view').innerHTML = '<p class="note">数据读取失败，请稍后刷新。</p>'; }
 })();
