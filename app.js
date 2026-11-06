@@ -249,7 +249,7 @@ window.addEventListener('hashchange', render);
 
 $('#lock-form').addEventListener('submit', async e => {
   e.preventDefault();
-  const pass = $('#pass').value.trim().toLowerCase(); $('#lock-err').textContent = '解锁中…';
+  const pass = $('#pass').value.trim().toLowerCase().replace(/[.。]+$/, ''); $('#lock-err').textContent = '解锁中…';
   try {
     const data = await decrypt(pass);
     if ($('#remember').checked) store.set('sa-pass', pass);
