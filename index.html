@@ -20,7 +20,7 @@
     <div class="eyebrow">个人持仓 · 加密数据</div>
     <h1>股票助手</h1>
     <label for="pass">输入密码解锁</label>
-    <input id="pass" name="password" type="password" autocomplete="current-password" required>
+    <div style="display:flex;gap:8px"><input id="pass" name="password" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" required style="flex:1;min-width:0"><button type="button" id="toggle-pass" class="topbtn" style="min-width:56px;border:1px solid var(--line);border-radius:12px;color:var(--ink)">隐藏</button></div>
     <label class="remember"><input id="remember" type="checkbox" checked> 在这台设备上记住</label>
     <button class="go" type="submit">解锁</button>
     <p class="err" id="lock-err" role="alert"></p>

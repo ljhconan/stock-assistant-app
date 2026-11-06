@@ -205,12 +205,16 @@ document.addEventListener('click', e => {
   if (e.target.closest('#lock-btn')) { store.del('sa-pass'); location.reload(); return; }
   const pb = e.target.closest('[data-period]'); if (pb) { period = +pb.dataset.period; render(); const b = document.querySelector(`[data-period="${period}"]`); if (b) b.focus(); }
 });
+$('#toggle-pass').addEventListener('click', () => {
+  const i = $('#pass'), show = i.type === 'password';
+  i.type = show ? 'text' : 'password'; $('#toggle-pass').textContent = show ? '隐藏' : '显示';
+});
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#sheet').hidden) closeDetail(); });
 window.addEventListener('hashchange', render);
 
 $('#lock-form').addEventListener('submit', async e => {
   e.preventDefault();
-  const pass = $('#pass').value; $('#lock-err').textContent = '解锁中…';
+  const pass = $('#pass').value.trim().toLowerCase(); $('#lock-err').textContent = '解锁中…';
   try {
     const data = await decrypt(pass);
     if ($('#remember').checked) store.set('sa-pass', pass);
