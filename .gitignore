@@ -1,0 +1,5 @@
+# 明文持仓数据，绝不提交
+data.json
+*.plain.json
+node_modules/
+.vercel

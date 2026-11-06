@@ -1,0 +1,6 @@
+{
+  "headers": [
+    { "source": "/data.enc.json", "headers": [{ "key": "Cache-Control", "value": "no-store" }] },
+    { "source": "/(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] }
+  ]
+}
