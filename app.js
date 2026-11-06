@@ -40,21 +40,56 @@ async function decrypt(pass){
   return JSON.parse(new TextDecoder().decode(pt));
 }
 
+let LIVE = null; // {at, quotes:{SYM:{c,pc}}}
+
+function buildRows(){
+  ROWS = D.holdings.map(r => {
+    const q = LIVE && LIVE.quotes[r[0]];
+    const close = q ? q.c : r[4], prev = q ? q.pc : r[5];
+    return {t:r[0],name:r[1],qty:r[2],cost:r[3],close,prev,ah:r[6],acct:r[7],live:!!q,
+      day:(close/prev-1)*100, pnl:(close/r[3]-1)*100, ahc:(r[6]/r[4]-1)*100};
+  }).sort((a,b) => a.day - b.day);
+  BY = Object.fromEntries(ROWS.map(x => [x.t, x]));
+}
+function totals(){
+  if (!LIVE) return D.totals;
+  let v = 0, p = 0, c = 0;
+  ROWS.forEach(x => { v += x.qty * x.close; p += x.qty * x.prev; c += x.qty * x.cost; });
+  return { label: D.totals.label, value: v, dayAbs: v - p, dayPct: (v / p - 1) * 100, vsCost: (v / c - 1) * 100 };
+}
+function stamp(){
+  if (!LIVE) return D.asOfLabel;
+  const t = new Date(LIVE.at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' });
+  return `实时价格 · 美东 ${t}（分析数据：${D.asOfLabel}）`;
+}
+async function refreshLive(){
+  try {
+    const syms = D.holdings.map(r => r[0]).join(',');
+    const r = await fetch('/api/quotes?symbols=' + syms, { cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j.quotes || !Object.keys(j.quotes).length) return;
+    LIVE = { at: j.at, quotes: j.quotes };
+    buildRows(); $('#asof').textContent = stamp(); render();
+  } catch {}
+}
+
 function load(data){
   D = data;
-  ROWS = D.holdings.map(r => ({t:r[0],name:r[1],qty:r[2],cost:r[3],close:r[4],prev:r[5],ah:r[6],acct:r[7],
-    day:(r[4]/r[5]-1)*100, pnl:(r[4]/r[3]-1)*100, ahc:(r[6]/r[4]-1)*100})).sort((a,b) => a.day - b.day);
-  BY = Object.fromEntries(ROWS.map(x => [x.t, x]));
-  $('#asof').textContent = D.asOfLabel;
+  buildRows();
+  $('#asof').textContent = stamp();
   $('#lock').hidden = true; $('#app').hidden = false;
   render();
+  refreshLive();
+  setInterval(() => { if (!document.hidden) refreshLive(); }, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshLive(); });
 }
 
 /* ===== 页面 ===== */
 function rowBtn(x){
   return `<button class="row-btn" data-open="${x.t}">
     <div class="row-main"><div class="tk">${x.t}<span class="nm">${esc(x.name)}</span></div>
-    <div class="sub num">较成本 ${pct(x.pnl)} · 盘后 ${pct(x.ahc)}</div></div>
+    <div class="sub num">较成本 ${pct(x.pnl)}${x.live ? '' : ' · 盘后 ' + pct(x.ahc)}</div></div>
     <div class="chg num ${cls(x.day)}">${pct(x.day)}</div>${chev}</button>`;
 }
 
@@ -62,7 +97,7 @@ let quietOpen = false;
 function today(){
   const big = ROWS.filter(x => x.day <= -10), mid = ROWS.filter(x => x.day > -10 && x.day <= -5), quiet = ROWS.filter(x => x.day > -5);
   const up = ROWS.filter(x => x.day >= 5);
-  const T = D.totals, b = D.banner;
+  const T = totals(), b = D.banner;
   const nextEarn = Object.entries(D.earnNext || {}).slice(0, 4);
   return `
   ${b ? `<div class="banner"><b>${esc(b.title)}</b><p>${esc(b.text)} <a href="#market">看市场页</a></p></div>` : ''}
@@ -152,8 +187,8 @@ function detail(t){
     </div>
     <div class="stack">
       <div class="card kv num">
-        <div><span>收盘</span><b>${usd(x.close)}</b></div>
-        <div><span>盘后</span><b class="${cls(x.ahc)}">${usd(x.ah)}</b></div>
+        <div><span>${x.live ? '现价（实时）' : '收盘'}</span><b>${usd(x.close)}</b></div>
+        <div><span>${x.live ? '前一日收盘' : '盘后'}</span><b class="${x.live ? '' : cls(x.ahc)}">${usd(x.live ? x.prev : x.ah)}</b></div>
         <div><span>平均成本</span><b>${usd(x.cost)}</b></div>
         <div><span>较成本</span><b class="${cls(x.pnl)}">${pct(x.pnl)}</b></div>
         <div><span>持股</span><b>${x.qty} 股</b></div>
