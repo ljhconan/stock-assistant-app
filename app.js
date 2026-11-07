@@ -151,18 +151,42 @@ function market(){
   <p class="foot">日期来自公开经济日历，官方可能调整，以劳工统计局和美联储公布为准。</p>`;
 }
 
+/* 观察清单：新格式是对象 {s,n,p,pc,hi,lo,tag,lists}，旧格式是数组 */
+function watchRows(){
+  return (D.watch || []).map(w => Array.isArray(w)
+    ? {s:w[0], n:'', p:w[1], pc:null, hi:w[2], lo:w[3], tag:w[4], lists:[D.watchSource]}
+    : w);
+}
+let watchSort = 'list';
 function watch(){
-  return `<p class="note">来自你的 Robinhood 清单"${esc(D.watchSource)}"。条形是 52 周价格区间，左低右高，蓝线是现价。</p>` +
-  D.watch.map(w => { const p = Math.max(0, Math.min(1, (w[1]-w[3])/(w[2]-w[3]))); const low = String(w[4]).startsWith('低于');
-    return `<div class="card" style="padding:12px 14px;display:flex;flex-direction:column;gap:6px">
-      <div style="display:flex;align-items:center;gap:8px"><span class="tk">${esc(w[0])}</span>${w[4]?`<span class="pill ${low?'p-down':'p-held'}">${esc(w[4])}</span>`:''}<span class="num" style="margin-left:auto;font-weight:600">${usd(w[1])}</span></div>
-      <div class="range"><i style="left:calc(${(p*100).toFixed(0)}% - 2px)"></i></div>
-      <div class="rng-lbl num"><span>低 ${usd(w[3])}</span><span>距高点 ${pct((w[1]/w[2]-1)*100)}</span><span>高 ${usd(w[2])}</span></div></div>`; }).join('');
+  const W = watchRows(), why = D.watchWhy || {};
+  const names = D.watchLists || [D.watchSource];
+  const day = w => w.pc ? (w.p / w.pc - 1) * 100 : null;
+  const row = w => { const p = Math.max(0, Math.min(1, (w.p-w.lo)/((w.hi-w.lo)||1))); const d = day(w); const low = String(w.tag||'').startsWith('低于');
+    return `<button class="card wrow" data-open="w:${esc(w.s)}" style="padding:12px 14px;display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;align-items:center;gap:8px;width:100%"><span class="tk">${esc(w.s)}</span><span class="nm" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.n)}</span>
+      ${why[w.s] ? '<span class="pill p-held">有解读</span>' : ''}${d!==null?`<span class="num ${cls(d)}" style="font-weight:600">${pct(d)}</span>`:''}<span class="num" style="font-weight:600">${usd(w.p)}</span></div>
+      ${w.tag?`<div><span class="pill ${low?'p-down':'p-watch'}">${esc(w.tag)}</span></div>`:''}
+      <div class="range" style="width:100%"><i style="left:calc(${(p*100).toFixed(0)}% - 2px)"></i></div>
+      <div class="rng-lbl num" style="width:100%"><span>低 ${usd(w.lo)}</span><span>距高点 ${pct((w.p/w.hi-1)*100)}</span><span>高 ${usd(w.hi)}</span></div></button>`; };
+  let body;
+  if (watchSort === 'list') {
+    body = names.map(n => { const g = W.filter(w => (w.lists||[]).includes(n)); return g.length ? `<div class="sec mute">${esc(n)} · ${g.length} 只</div>${g.map(row).join('')}` : ''; }).join('');
+  } else {
+    const k = watchSort === 'day' ? (w => day(w) ?? 0) : (w => w.p / w.hi - 1);
+    body = [...W].sort((a, b) => k(a) - k(b)).map(row).join('');
+  }
+  return `<p class="note">你在 Robinhood 自建的清单（${names.map(esc).join('、')}）里、没有持有的股票。条形是 52 周价格区间，左低右高。点开看当天涨跌的原因（大涨大跌的才有）。</p>
+  <div class="seg" role="group" aria-label="排序">${[['list','按清单'],['day','今日跌幅'],['hi','离高点最远']].map(([k,l]) => `<button data-wsort="${k}" aria-pressed="${k===watchSort}">${l}</button>`).join('')}</div>
+  ${body}`;
 }
 
+const VERDICT = {cheap:['看起来是真便宜','v-cheap'], mixed:['一半一半，要看后面','v-mixed'], trap:['更像是公司变差了','v-trap']};
 function radar(){
-  return `<p class="note">来自你的 Robinhood 扫描器"捡漏雷达"（RSI 低于 40）。这里只列市值 500 亿美元以上、你没持有的，按超卖程度排。RSI 低于 30 算深度超卖。超卖只是起点，不等于便宜。</p>
-  <div class="card list">${D.radar.map(r => { const deep = r[4] < 30; return `<div class="li"><div class="row-main"><div><b>${esc(r[0])}</b><span class="nm">${esc(r[1])}</span></div><div class="sub num">${usd(r[2])} · 市值 ${r[3]>=1000?'$'+(r[3]/1000).toFixed(1)+'T':'$'+r[3]+'B'}</div></div><span class="rsi num" style="color:var(--${deep?'down':'warn'});background:var(--${deep?'down':'warn'}-soft)">RSI ${Number(r[4]).toFixed(0)}</span></div>`; }).join('')}</div>`;
+  const I = D.radarInfo || {};
+  return `<p class="note">来自你的 Robinhood 扫描器"捡漏雷达"（RSI 低于 40）。只列市值 500 亿美元以上、你没持有的，按超卖程度排。RSI 低于 30 算深度超卖。点开看为什么跌、是真便宜还是公司变差。</p>
+  <div class="card list">${D.radar.map(r => { const deep = r[4] < 30, v = I[r[0]] && VERDICT[I[r[0]].verdict];
+    return `<button class="li wrow" data-open="r:${esc(r[0])}" style="padding-left:0;padding-right:0"><div class="row-main"><div><b>${esc(r[0])}</b><span class="nm">${esc(r[1])}</span></div><div class="sub num">${usd(r[2])} · 市值 ${r[3]>=1000?'$'+(r[3]/1000).toFixed(1)+'T':'$'+r[3]+'B'}</div>${v?`<div style="margin-top:4px"><span class="pill ${v[1]==='v-cheap'?'p-up':v[1]==='v-trap'?'p-down':'p-watch'}">${v[0]}</span></div>`:''}</div><span class="rsi num" style="color:var(--${deep?'down':'warn'});background:var(--${deep?'down':'warn'}-soft)">RSI ${Number(r[4]).toFixed(0)}</span>${chev}</button>`; }).join('')}</div>`;
 }
 
 function earnings(){
@@ -171,6 +195,75 @@ function earnings(){
 }
 
 /* ===== 详情页 ===== */
+function srcs(list){
+  if (!list || !list.length) return '';
+  return `<div class="src-list">来源：${list.map(x => Array.isArray(x) ? `<a href="${esc(x[1])}" target="_blank" rel="noopener">${esc(x[0])}</a>` : esc(x)).join('')}</div>`;
+}
+function whyBox(w, day, title){
+  if (!w) return '';
+  return `<div class="explain why ${day>=0?'up':'down'}"><h3>${title || (day>=0?'今天为什么涨':'今天为什么跌')}</h3><p>${esc(w.text)}</p>${srcs(w.src)}</div>`;
+}
+function sheetHead(sym, sub, right){
+  return `<div class="sheet-head">
+      <button class="back" id="close" aria-label="返回"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div style="min-width:0"><div class="tk" id="sheet-title">${esc(sym)}</div><div class="sub">${esc(sub)}</div></div>
+      ${right}
+    </div>`;
+}
+function watchDetail(t){
+  const w = watchRows().find(x => x.s === t); if (!w) return '';
+  const d = w.pc ? (w.p / w.pc - 1) * 100 : null, why = (D.watchWhy || {})[t];
+  return `<div class="in">${sheetHead(t, w.n + ' · ' + (w.lists||[]).join('、'), d!==null?`<div class="chg num ${cls(d)}" style="margin-left:auto">今日 ${pct(d)}</div>`:'')}
+    <div class="stack">
+      <div class="card kv num">
+        <div><span>收盘</span><b>${usd(w.p)}</b></div>
+        <div><span>前一日收盘</span><b>${w.pc?usd(w.pc):'暂无'}</b></div>
+        <div><span>52 周高</span><b>${usd(w.hi)}</b></div>
+        <div><span>52 周低</span><b>${usd(w.lo)}</b></div>
+        <div><span>距高点</span><b class="neg">${pct((w.p/w.hi-1)*100)}</b></div>
+        <div><span>距低点</span><b class="pos">${pct((w.p/w.lo-1)*100)}</b></div>
+      </div>
+      ${why ? whyBox(why, d ?? 0) : `<div class="explain"><p>今天涨跌在 5% 以内，没有单独查新闻。</p></div>`}
+      <p class="foot">价格：Robinhood。解读根据当天新闻整理，不是买卖建议。</p>
+    </div></div>`;
+}
+function radarDetail(t){
+  const r = D.radar.find(x => x[0] === t); if (!r) return '';
+  const I = (D.radarInfo || {})[t] || {}, v = VERDICT[I.verdict], a = I.analyst;
+  const x1 = n => n.toFixed(1) + '×';
+  const peFmt = n => n < 0 ? '负值' : (n > 200 ? n.toFixed(0) + '×' : x1(n));
+  let anaHtml = '';
+  if (a && (a.buy + a.hold + a.sell) > 0) {
+    const n = a.buy + a.hold + a.sell, f = k => (a[k] / n * 100).toFixed(0);
+    anaHtml = `<div class="explain"><h3>华尔街分析师（${n} 位）</h3>
+      <div class="ana" aria-hidden="true"><i style="width:${f('buy')}%;background:var(--up)"></i><i style="width:${f('hold')}%;background:var(--warn)"></i><i style="width:${f('sell')}%;background:var(--down)"></i></div>
+      <div class="ana-lbl num"><span>买入 ${a.buy}</span><span>持有 ${a.hold}</span><span>卖出 ${a.sell}</span></div>
+      ${a.target ? `<p class="num">平均目标价 ${usd(a.target)}，比现价 ${pct((a.target/r[2]-1)*100)}${a.lo&&a.hi?`（区间 ${usd(a.lo)} – ${usd(a.hi)}）`:''}</p>` : ''}</div>`;
+  }
+  const list = (h, arr) => arr && arr.length ? `<div class="explain"><h3>${h}</h3><ul>${arr.map(p => `<li>${esc(p)}</li>`).join('')}</ul></div>` : '';
+  return `<div class="in">${sheetHead(t, r[1], `<span class="rsi num" style="margin-left:auto;color:var(--${r[4]<30?'down':'warn'});background:var(--${r[4]<30?'down':'warn'}-soft)">RSI ${Number(r[4]).toFixed(0)}</span>`)}
+    <div class="stack">
+      <div class="card kv num">
+        <div><span>现价</span><b>${usd(r[2])}</b></div>
+        <div><span>市值</span><b>${r[3]>=1000?'$'+(r[3]/1000).toFixed(1)+'T':'$'+r[3]+'B'}</b></div>
+        <div><span>距 52 周高点</span><b class="neg">${I.off52!=null?pct(I.off52):'暂无'}</b></div>
+        <div><span>近一月</span><b class="${cls(I.m1||0)}">${I.m1!=null?pct(I.m1):'暂无'}</b></div>
+      </div>
+      ${v ? `<div class="verdict-box ${v[1]}"><span class="eyebrow">Claude 的判断（AI 观点）</span><b>${v[0]}</b><p>${esc(I.view||'')}</p></div>` : '<div class="explain"><p>这只还没有分析，下次更新会补上。</p></div>'}
+      ${I.fell ? `<div class="explain why down"><h3>为什么跌</h3><p>${esc(I.fell)}</p></div>` : ''}
+      ${list('支持"真便宜"的理由', I.bull)}
+      ${list('担心"公司变差"的理由', I.bear)}
+      <div class="metrics">
+        ${metric('市盈率 PE', I.pe, false, peFmt)}
+        ${metric('远期市盈率', I.fpe, false, x1)}
+        ${metric('市销率 PS', I.ps, false, x1)}
+        ${metric('营收同比（最近一季）', I.g, false, n => (n>=0?'+':'') + n.toFixed(0) + '%')}
+      </div>
+      ${anaHtml}
+      ${srcs(I.src)}
+      <p class="foot">评级和目标价：Robinhood。判断是 AI 根据公开数据和新闻做的分析，可能出错，不是买卖建议。</p>
+    </div></div>`;
+}
 function metric(label, val, key, fmt){
   if (val === null || val === undefined) return `<div class="m na"><span>${label}</span><b>暂无</b></div>`;
   return `<div class="m${key?' key':''}"><span>${label}</span><b class="num">${fmt(val)}</b>${key?'<em>这类股票重点看</em>':''}</div>`;
@@ -194,6 +287,7 @@ function detail(t){
         <div><span>持股</span><b>${x.qty} 股</b></div>
         <div><span>市值</span><b>${usd(x.qty*x.close)}</b></div>
       </div>
+      ${whyBox(v.why, x.day)}
       <div class="sec mute" style="display:flex;align-items:center;gap:8px">估值 <span class="type">${ty.name}</span></div>
       <div class="metrics">
         ${metric('市盈率 PE（过去12个月）', v.pe, v.key==='pe', peFmt)}
@@ -225,7 +319,7 @@ function render(){
 let lastFocus = null;
 function openDetail(t){
   lastFocus = document.activeElement;
-  const s = $('#sheet'); s.innerHTML = detail(t); s.hidden = false; s.scrollTop = 0;
+  const s = $('#sheet'); s.innerHTML = t.startsWith('r:') ? radarDetail(t.slice(2)) : t.startsWith('w:') ? watchDetail(t.slice(2)) : detail(t); s.hidden = false; s.scrollTop = 0;
   document.body.style.overflow = 'hidden'; $('#close').focus();
 }
 function closeDetail(){
@@ -238,6 +332,7 @@ document.addEventListener('click', e => {
   if (e.target.closest('#close')) { closeDetail(); return; }
   if (e.target.closest('#quiet-toggle')) { quietOpen = !quietOpen; render(); $('#quiet-toggle').focus(); return; }
   if (e.target.closest('#lock-btn')) { store.del('sa-pass'); location.reload(); return; }
+  const ws = e.target.closest('[data-wsort]'); if (ws) { watchSort = ws.dataset.wsort; render(); return; }
   const pb = e.target.closest('[data-period]'); if (pb) { period = +pb.dataset.period; render(); const b = document.querySelector(`[data-period="${period}"]`); if (b) b.focus(); }
 });
 $('#toggle-pass').addEventListener('click', () => {

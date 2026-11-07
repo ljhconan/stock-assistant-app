@@ -136,3 +136,20 @@ body{margin:0}
 .lock .remember{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--muted)}
 .lock .remember input{min-height:auto;width:18px;height:18px}
 .topbtn{border:0;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;padding:4px 0;min-height:32px}
+
+/* 解读、观察分组、捡漏分析 */
+.why{border-left:3px solid var(--accent)}
+.why.up{border-left-color:var(--up)} .why.down{border-left-color:var(--down)}
+.src-list{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 10px}
+.src-list a{color:var(--accent)}
+.p-up{color:var(--up);background:var(--up-soft)}
+.verdict-box{border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.verdict-box b{font-size:17px}
+.verdict-box p{margin:0;font-size:14px}
+.v-cheap{background:var(--up-soft)} .v-cheap b{color:var(--up)}
+.v-mixed{background:var(--warn-soft)} .v-mixed b{color:var(--warn)}
+.v-trap{background:var(--down-soft)} .v-trap b{color:var(--down)}
+.ana{display:flex;height:10px;border-radius:999px;overflow:hidden;background:var(--line)}
+.ana i{display:block;height:100%}
+.ana-lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.wrow{width:100%;text-align:left;background:var(--surface);border:0;color:inherit;font:inherit;cursor:pointer}
