@@ -6,7 +6,7 @@
 const HIST = {};
 const HIST_BASE = 'https://raw.githubusercontent.com/ljhconan/stock-assistant-app/hist/';
 async function histName(sym){
-  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(PASS), { name:'HMAC', hash:'SHA-256' }, false, ['sign']);
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(PASS || store.get('sa-pass') || 'x'), { name:'HMAC', hash:'SHA-256' }, false, ['sign']);
   const sig = new Uint8Array(await crypto.subtle.sign('HMAC', k, new TextEncoder().encode(sym)));
   return [...sig].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 24);
 }
@@ -15,8 +15,8 @@ function getHist(sym){
   if (!HIST[sym]) HIST[sym] = histName(sym)
     .then(n => fetch(HIST_BASE + n + '.json', { cache:'no-cache' }))
     .then(r => r.ok ? r.json() : Promise.reject(new Error('gh ' + r.status))).then(okHist)
-    .catch(() => fetch('/api/history?symbol=' + encodeURIComponent(sym))
-      .then(r => r.ok ? r.json() : Promise.reject(new Error('api ' + r.status))).then(okHist))
+    .catch(e1 => fetch('/api/history?symbol=' + encodeURIComponent(sym))
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(e1.message + '；api ' + r.status))).then(okHist))
     .catch(e => { delete HIST[sym]; throw e; });
   return HIST[sym];
 }
@@ -26,7 +26,7 @@ let EC = null;
 function loadEcharts(){
   if (window.echarts) return Promise.resolve(window.echarts);
   if (!EC) EC = new Promise((ok, no) => { const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.1/echarts.min.js'; s.onload = () => ok(window.echarts); s.onerror = no; document.head.appendChild(s); });
+    s.src = 'vendor/echarts.min.js?v=5.5.1'; s.onload = () => ok(window.echarts); s.onerror = () => { EC = null; no(new Error('图表库加载失败')); }; document.head.appendChild(s); });
   return EC;
 }
 const css = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
@@ -59,7 +59,7 @@ const peFmt = n => n < 0 ? '负值' : (n > 200 ? n.toFixed(0) + '×' : x1(n));
 const pct0 = v => v == null ? '—' : (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(0) + '%';
 const p2 = v => v == null ? '—' : v.toFixed(2);
 const loading = msg => `<div class="explain"><p class="sub">${msg || '正在读取历史行情…'}</p></div>`;
-const failBox = () => `<div class="explain"><p>历史行情暂时读取不到，稍后再打开试试。</p></div>`;
+const failBox = e => `<div class="explain"><p>${e && /图表库/.test(e.message) ? '图表组件加载失败，请检查网络后重开。' : '历史行情暂时读取不到，稍后再打开试试。'}</p><p class="sub">原因：${esc(e ? e.message : '未知')}</p></div>`;
 function btText(b, what){
   if (!b || !b.n) return `过去两年没有出现过"${what}"。`;
   if (!b.done) return `过去两年出现 ${b.n} 次"${what}"，时间太近，还没有 20 天后的结果。`;
@@ -118,7 +118,7 @@ function drawSheet(){
   Promise.all([getHist(CUR.t), loadEcharts()]).then(([H]) => {
     if (CUR !== my) return;
     ({ chart: tabChart, lv: tabLevels, peer: tabPeers, hist: tabHistory })[tab](body, H, h.price);
-  }).catch(() => { if (CUR === my) body.innerHTML = failBox(); });
+  }).catch(e => { if (CUR === my) body.innerHTML = failBox(e); });
 }
 
 /* ===== 概览 ===== */
@@ -230,7 +230,7 @@ function fillOverviewAsync(my){
           <p>β ${p2(bq.beta)} 的意思是：纳指每涨跌 1%，这只股票平均涨跌约 ${Math.abs(bq.beta).toFixed(1)}%。相关系数平方 R² = ${(bq.r2*100).toFixed(0)}%，表示它的日波动里大约有这么多能用纳指解释${bq.r2 < 0.3 ? '，剩下的主要是公司自身因素' : ''}。</p></div>`);
       }).catch(() => {});
     }
-  }).catch(() => { if (CUR === my) { const slot = $('#tech-slot'); if (slot) slot.innerHTML = failBox(); } });
+  }).catch(e => { if (CUR === my) { const slot = $('#tech-slot'); if (slot) slot.innerHTML = failBox(e); } });
 }
 
 /* ===== 图表 ===== */
