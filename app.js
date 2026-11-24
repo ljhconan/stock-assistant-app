@@ -112,7 +112,15 @@ function today(){
   ${nextEarn.length ? `<div class="sec mute">接下来的持仓财报</div>
   <div class="card list">${nextEarn.map(([t, w]) => `<div class="li"><b>${esc(t)}</b><span class="sub" style="margin-left:auto">${esc(w)}</span></div>`).join('')}</div>` : ''}
   <button class="link-btn" id="quiet-toggle" aria-expanded="${quietOpen}"><span>其余 ${quiet.filter(x=>x.day<5).length} 只涨跌在 5% 以内</span><span>${quietOpen?'收起':'展开'}</span></button>
-  <div class="card grid3" ${quietOpen?'':'hidden'}>${quiet.filter(x=>x.day<5).map(x => `<button class="mini" data-open="${x.t}"><b>${x.t}</b><span class="num ${cls(x.day)}">${pct(x.day)}</span></button>`).join('')}</div>`;
+  <div class="card grid3" ${quietOpen?'':'hidden'}>${quiet.filter(x=>x.day<5).map(x => `<button class="mini" data-open="${x.t}"><b>${x.t}</b><span class="num ${cls(x.day)}">${pct(x.day)}</span></button>`).join('')}</div>
+  ${verifyFoot()}`;
+}
+
+function verifyFoot(){
+  const V = D.verify; if (!V || !V.checks) return '';
+  const bad = V.checks.filter(c => !c[1]);
+  return `<details class="verify ${bad.length ? 'bad' : ''}"><summary>${bad.length ? `⚠ 本次更新有 ${bad.length} 项核对没通过` : `✓ 本次更新通过 ${V.checks.length} 项核对`}</summary>
+    <ul>${V.checks.map(c => `<li class="${c[1] ? '' : 'neg'}">${c[1] ? '✓' : '✗'} ${esc(c[0])}${c[2] ? '：' + esc(c[2]) : ''}</li>`).join('')}</ul></details>`;
 }
 
 let period = 2;
@@ -148,7 +156,8 @@ function market(){
   ${D.newsSource ? `<p class="foot">来源：<a href="${esc(D.newsSource.url)}" target="_blank" rel="noopener">${esc(D.newsSource.label)}</a></p>` : ''}
   <div class="sec mute">经济日历</div>
   <div class="card" style="padding:0 14px">${D.cal.map((c, k) => `<div class="cal${k===0?' next':''}"><div class="d num">${esc(c[0])}<span>${esc(c[1])}</span></div><div><b>${esc(c[2])}</b><p>${esc(c[3])}</p></div></div>`).join('')}</div>
-  <p class="foot">日期来自公开经济日历，官方可能调整，以劳工统计局和美联储公布为准。</p>`;
+  <p class="foot">日期来自公开经济日历，官方可能调整，以劳工统计局和美联储公布为准。</p>
+  ${riskSection()}`;
 }
 
 /* 观察清单：新格式是对象 {s,n,p,pc,hi,lo,tag,lists}，旧格式是数组 */
@@ -194,118 +203,6 @@ function earnings(){
   D.earnings.map(g => `<div class="sec mute">${esc(g[0])}</div><div class="card list">${g[1].map(e => `<div class="li"><b>${esc(e[0])}</b><span class="pill ${e[2]==='held'?'p-held':'p-watch'}">${e[2]==='held'?'持仓':'观察'}</span><span class="sub" style="margin-left:auto">${esc(e[1])}</span></div>`).join('')}</div>`).join('');
 }
 
-/* ===== 详情页 ===== */
-function srcs(list){
-  if (!list || !list.length) return '';
-  return `<div class="src-list">来源：${list.map(x => Array.isArray(x) ? `<a href="${esc(x[1])}" target="_blank" rel="noopener">${esc(x[0])}</a>` : esc(x)).join('')}</div>`;
-}
-function whyBox(w, day, title){
-  if (!w) return '';
-  return `<div class="explain why ${day>=0?'up':'down'}"><h3>${title || (day>=0?'今天为什么涨':'今天为什么跌')}</h3><p>${esc(w.text)}</p>${srcs(w.src)}</div>`;
-}
-function sheetHead(sym, sub, right){
-  return `<div class="sheet-head">
-      <button class="back" id="close" aria-label="返回"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
-      <div style="min-width:0"><div class="tk" id="sheet-title">${esc(sym)}</div><div class="sub">${esc(sub)}</div></div>
-      ${right}
-    </div>`;
-}
-function watchDetail(t){
-  const w = watchRows().find(x => x.s === t); if (!w) return '';
-  const d = w.pc ? (w.p / w.pc - 1) * 100 : null, why = (D.watchWhy || {})[t];
-  return `<div class="in">${sheetHead(t, w.n + ' · ' + (w.lists||[]).join('、'), d!==null?`<div class="chg num ${cls(d)}" style="margin-left:auto">今日 ${pct(d)}</div>`:'')}
-    <div class="stack">
-      <div class="card kv num">
-        <div><span>收盘</span><b>${usd(w.p)}</b></div>
-        <div><span>前一日收盘</span><b>${w.pc?usd(w.pc):'暂无'}</b></div>
-        <div><span>52 周高</span><b>${usd(w.hi)}</b></div>
-        <div><span>52 周低</span><b>${usd(w.lo)}</b></div>
-        <div><span>距高点</span><b class="neg">${pct((w.p/w.hi-1)*100)}</b></div>
-        <div><span>距低点</span><b class="pos">${pct((w.p/w.lo-1)*100)}</b></div>
-      </div>
-      ${why ? whyBox(why, d ?? 0) : `<div class="explain"><p>今天涨跌在 5% 以内，没有单独查新闻。</p></div>`}
-      <p class="foot">价格：Robinhood。解读根据当天新闻整理，不是买卖建议。</p>
-    </div></div>`;
-}
-function radarDetail(t){
-  const r = D.radar.find(x => x[0] === t); if (!r) return '';
-  const I = (D.radarInfo || {})[t] || {}, v = VERDICT[I.verdict], a = I.analyst;
-  const x1 = n => n.toFixed(1) + '×';
-  const peFmt = n => n < 0 ? '负值' : (n > 200 ? n.toFixed(0) + '×' : x1(n));
-  let anaHtml = '';
-  if (a && (a.buy + a.hold + a.sell) > 0) {
-    const n = a.buy + a.hold + a.sell, f = k => (a[k] / n * 100).toFixed(0);
-    anaHtml = `<div class="explain"><h3>华尔街分析师（${n} 位）</h3>
-      <div class="ana" aria-hidden="true"><i style="width:${f('buy')}%;background:var(--up)"></i><i style="width:${f('hold')}%;background:var(--warn)"></i><i style="width:${f('sell')}%;background:var(--down)"></i></div>
-      <div class="ana-lbl num"><span>买入 ${a.buy}</span><span>持有 ${a.hold}</span><span>卖出 ${a.sell}</span></div>
-      ${a.target ? `<p class="num">平均目标价 ${usd(a.target)}，比现价 ${pct((a.target/r[2]-1)*100)}${a.lo&&a.hi?`（区间 ${usd(a.lo)} – ${usd(a.hi)}）`:''}</p>` : ''}</div>`;
-  }
-  const list = (h, arr) => arr && arr.length ? `<div class="explain"><h3>${h}</h3><ul>${arr.map(p => `<li>${esc(p)}</li>`).join('')}</ul></div>` : '';
-  return `<div class="in">${sheetHead(t, r[1], `<span class="rsi num" style="margin-left:auto;color:var(--${r[4]<30?'down':'warn'});background:var(--${r[4]<30?'down':'warn'}-soft)">RSI ${Number(r[4]).toFixed(0)}</span>`)}
-    <div class="stack">
-      <div class="card kv num">
-        <div><span>现价</span><b>${usd(r[2])}</b></div>
-        <div><span>市值</span><b>${r[3]>=1000?'$'+(r[3]/1000).toFixed(1)+'T':'$'+r[3]+'B'}</b></div>
-        <div><span>距 52 周高点</span><b class="neg">${I.off52!=null?pct(I.off52):'暂无'}</b></div>
-        <div><span>近一月</span><b class="${cls(I.m1||0)}">${I.m1!=null?pct(I.m1):'暂无'}</b></div>
-      </div>
-      ${v ? `<div class="verdict-box ${v[1]}"><span class="eyebrow">Claude 的判断（AI 观点）</span><b>${v[0]}</b><p>${esc(I.view||'')}</p></div>` : '<div class="explain"><p>这只还没有分析，下次更新会补上。</p></div>'}
-      ${I.fell ? `<div class="explain why down"><h3>为什么跌</h3><p>${esc(I.fell)}</p></div>` : ''}
-      ${list('支持"真便宜"的理由', I.bull)}
-      ${list('担心"公司变差"的理由', I.bear)}
-      <div class="metrics">
-        ${metric('市盈率 PE', I.pe, false, peFmt)}
-        ${metric('远期市盈率', I.fpe, false, x1)}
-        ${metric('市销率 PS', I.ps, false, x1)}
-        ${metric('营收同比（最近一季）', I.g, false, n => (n>=0?'+':'') + n.toFixed(0) + '%')}
-      </div>
-      ${anaHtml}
-      ${srcs(I.src)}
-      <p class="foot">评级和目标价：Robinhood。判断是 AI 根据公开数据和新闻做的分析，可能出错，不是买卖建议。</p>
-    </div></div>`;
-}
-function metric(label, val, key, fmt){
-  if (val === null || val === undefined) return `<div class="m na"><span>${label}</span><b>暂无</b></div>`;
-  return `<div class="m${key?' key':''}"><span>${label}</span><b class="num">${fmt(val)}</b>${key?'<em>这类股票重点看</em>':''}</div>`;
-}
-function detail(t){
-  const x = BY[t], v = (D.val || {})[t] || {type:'value'}, ty = TYPES[v.type] || TYPES.value;
-  const x1 = n => n.toFixed(1) + '×';
-  const peFmt = n => n < 0 ? '负值' : (n > 200 ? n.toFixed(0) + '×' : x1(n));
-  return `<div class="in">
-    <div class="sheet-head">
-      <button class="back" id="close" aria-label="返回"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
-      <div style="min-width:0"><div class="tk" id="sheet-title">${x.t}</div><div class="sub">${esc(x.name)} · ${esc(x.acct)}</div></div>
-      <div class="chg num ${cls(x.day)}" style="margin-left:auto">今日 ${pct(x.day)}</div>
-    </div>
-    <div class="stack">
-      <div class="card kv num">
-        <div><span>${x.live ? '现价（实时）' : '收盘'}</span><b>${usd(x.close)}</b></div>
-        <div><span>${x.live ? '前一日收盘' : '盘后'}</span><b class="${x.live ? '' : cls(x.ahc)}">${usd(x.live ? x.prev : x.ah)}</b></div>
-        <div><span>平均成本</span><b>${usd(x.cost)}</b></div>
-        <div><span>较成本</span><b class="${cls(x.pnl)}">${pct(x.pnl)}</b></div>
-        <div><span>持股</span><b>${x.qty} 股</b></div>
-        <div><span>市值</span><b>${usd(x.qty*x.close)}</b></div>
-      </div>
-      ${whyBox(v.why, x.day)}
-      <div class="sec mute" style="display:flex;align-items:center;gap:8px">估值 <span class="type">${ty.name}</span></div>
-      <div class="metrics">
-        ${metric('市盈率 PE（过去12个月）', v.pe, v.key==='pe', peFmt)}
-        ${metric('远期市盈率', v.fpe, v.key==='fpe', x1)}
-        ${metric('市销率 PS', v.ps, v.key==='ps', x1)}
-        ${metric('营收同比（最近一季）', v.g, false, n => (n>=0?'+':'') + n.toFixed(0) + '%')}
-        ${metric('净利率（最近一季）', v.nm, v.key==='nm', n => n.toFixed(1) + '%')}
-        ${metric('市净率 PB', v.pb, v.key==='pb', x1)}
-        ${metric('股息率', v.dy, v.key==='dy', n => n.toFixed(2) + '%')}
-      </div>
-      <div class="explain"><h3>${ty.name}：${ty.what}</h3><p>${ty.body}</p><ul>${ty.points.map(p => `<li>${p}</li>`).join('')}</ul></div>
-      ${v.note ? `<div class="explain"><h3>${x.t} 现在的数字</h3><p>${esc(v.note)}</p></div>` : ''}
-      ${v.ai ? `<div class="explain"><h3>今日解读（AI 观点）</h3><p>${esc(v.ai)}</p></div>` : ''}
-      <div class="card" style="padding:14px"><div class="sub">下次财报</div><div>${esc((D.earnNext||{})[t] || '未来两周没有')}</div></div>
-      <p class="foot">数据：Robinhood。PS 用市值 ÷ 过去 4 个季度营收计算。以上是数字说明，不是买卖建议。</p>
-    </div></div>`;
-}
-
 /* ===== 路由和交互 ===== */
 const TITLES = {today:'今日', market:'市场', watch:'观察清单', radar:'捡漏', earnings:'财报日历'};
 function render(){
@@ -315,16 +212,6 @@ function render(){
   $('#title').textContent = TITLES[tab];
   $('#view').innerHTML = {today, market, watch, radar, earnings}[tab]();
   document.querySelectorAll('.tab').forEach(b => { if (b.dataset.tab === tab) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
-}
-let lastFocus = null;
-function openDetail(t){
-  lastFocus = document.activeElement;
-  const s = $('#sheet'); s.innerHTML = t.startsWith('r:') ? radarDetail(t.slice(2)) : t.startsWith('w:') ? watchDetail(t.slice(2)) : detail(t); s.hidden = false; s.scrollTop = 0;
-  document.body.style.overflow = 'hidden'; $('#close').focus();
-}
-function closeDetail(){
-  const s = $('#sheet'); s.hidden = true; s.innerHTML = ''; document.body.style.overflow = '';
-  if (lastFocus) lastFocus.focus();
 }
 document.addEventListener('click', e => {
   const o = e.target.closest('[data-open]'); if (o) { openDetail(o.dataset.open); return; }
