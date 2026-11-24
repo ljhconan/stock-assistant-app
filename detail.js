@@ -2,11 +2,21 @@
    日线来自 /api/history，指标在 ta.js 里算；估值、财报、新闻来自加密数据。 */
 
 /* ===== 日线缓存 ===== */
+// 先读 GitHub Action 每天生成的文件（文件名 = HMAC(密码, 代码) 前 24 位），没有再试 Vercel 接口。
 const HIST = {};
+const HIST_BASE = 'https://raw.githubusercontent.com/ljhconan/stock-assistant-app/hist/';
+async function histName(sym){
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(PASS), { name:'HMAC', hash:'SHA-256' }, false, ['sign']);
+  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', k, new TextEncoder().encode(sym)));
+  return [...sig].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 24);
+}
+const okHist = j => { if (!j || !j.c || j.c.length < 30) throw new Error('empty'); return j; };
 function getHist(sym){
-  if (!HIST[sym]) HIST[sym] = fetch('/api/history?symbol=' + encodeURIComponent(sym))
-    .then(r => r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)))
-    .then(j => { if (!j.c || j.c.length < 30) throw new Error('empty'); return j; })
+  if (!HIST[sym]) HIST[sym] = histName(sym)
+    .then(n => fetch(HIST_BASE + n + '.json', { cache:'no-cache' }))
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('gh ' + r.status))).then(okHist)
+    .catch(() => fetch('/api/history?symbol=' + encodeURIComponent(sym))
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('api ' + r.status))).then(okHist))
     .catch(e => { delete HIST[sym]; throw e; });
   return HIST[sym];
 }

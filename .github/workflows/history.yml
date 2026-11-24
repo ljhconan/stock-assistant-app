@@ -1,0 +1,34 @@
+name: 更新历史行情
+on:
+  push:
+    branches: [main]
+    paths: [data.enc.json]
+  schedule:
+    - cron: '35 21 * * 1-5'   # 美东收盘后
+    - cron: '25 12 * * 1-5'   # 美东开盘前
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: history
+  cancel-in-progress: true
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install -q yfinance cryptography
+      - run: python scripts/fetch_hist.py
+        env:
+          PASSCODE: ${{ secrets.PASSCODE }}
+      - name: 推送到 hist 分支（每次覆盖，不留历史）
+        run: |
+          cd out
+          git init -q -b hist
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A && git commit -qm "history $(date -u +%F)"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" hist

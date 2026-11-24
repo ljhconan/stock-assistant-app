@@ -16,3 +16,8 @@ git add data.enc.json && git commit -m "data: 更新" && git push
 ```
 
 Vercel 检测到推送后自动重新部署。
+
+## 历史行情（图表用）
+GitHub Action `.github/workflows/history.yml` 在开盘前、收盘后和每次数据更新后，从 Yahoo Finance 下载两年日线，
+推送到 `hist` 分支。文件名是 HMAC(密码, 代码)，看不出持仓。需要在仓库 Settings → Secrets and variables → Actions
+里设置 `PASSCODE`（和网页解锁密码相同）。以后改密码时这里也要一起改。

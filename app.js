@@ -25,7 +25,7 @@ const chev = '<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill=
 const store = { get(k){ try { return localStorage.getItem(k); } catch { return null; } },
   set(k,v){ try { localStorage.setItem(k,v); } catch {} }, del(k){ try { localStorage.removeItem(k); } catch {} } };
 
-let D = null, ROWS = [], BY = {};
+let D = null, ROWS = [], BY = {}, PASS = '';
 
 /* ===== 解密 ===== */
 const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
@@ -233,7 +233,7 @@ $('#lock-form').addEventListener('submit', async e => {
   e.preventDefault();
   const pass = $('#pass').value.trim().toLowerCase().replace(/[.。]+$/, ''); $('#lock-err').textContent = '解锁中…';
   try {
-    const data = await decrypt(pass);
+    const data = await decrypt(pass); PASS = pass;
     if ($('#remember').checked) store.set('sa-pass', pass);
     $('#lock-err').textContent = '';
     load(data);
@@ -244,6 +244,6 @@ $('#lock-form').addEventListener('submit', async e => {
 
 (async () => {
   const saved = store.get('sa-pass');
-  if (saved) { try { load(await decrypt(saved)); return; } catch { store.del('sa-pass'); } }
+  if (saved) { try { const d = await decrypt(saved); PASS = saved; load(d); return; } catch { store.del('sa-pass'); } }
   $('#pass').focus();
 })();
