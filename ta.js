@@ -167,5 +167,25 @@ const TA = (() => {
     return { ...out, min: s[0], max: s[s.length - 1], med: q(0.5), now: out.pe[out.pe.length - 1] };
   }
 
-  return { all, signals, backtest, state, levels, beta, ret, vol, earnReact, peHistory };
+  // 白话解读：把当前状态翻成几句话，并找过去两年"类似状态"出现后 20 天的表现
+  function plain(H, I, S) {
+    const n = H.c.length - 1, c = H.c[n], r = I.rsi[n];
+    const above60 = c > I.ma60[n], above250 = I.ma250[n] != null ? c > I.ma250[n] : null;
+    const rb = x => x == null ? null : x < 30 ? 0 : x < 45 ? 1 : x <= 55 ? 2 : x <= 70 ? 3 : 4;
+    const trend = above250 === null ? (above60 ? '最近三个月整体在涨' : '最近三个月整体在跌')
+      : above60 && above250 ? '中长期都在上升趋势里' : !above60 && !above250 ? '中长期都在下跌趋势里'
+      : above250 ? '长期还在上升，但最近三个月走弱了' : '长期偏弱，但最近三个月在反弹';
+    const where = S.pos < 15 ? '价格接近一年里的最低点' : S.pos > 85 ? '价格接近一年里的最高点' : S.pos < 40 ? '价格在一年区间的偏低位置' : S.pos > 60 ? '价格在一年区间的偏高位置' : '价格在一年区间的中间';
+    const mood = r == null ? '' : r < 30 ? '短期跌得非常急，市场情绪恐慌（超卖）' : r < 45 ? '短期偏弱' : r <= 55 ? '短期没有明显方向' : r <= 70 ? '短期偏强' : '短期涨得非常急，市场情绪亢奋（超买）';
+    // 类似状态：同在 60 日线同一侧、RSI 在同一档
+    const idx = [];
+    for (let i = 60; i < n - 20; i++) if (I.rsi[i] != null && I.ma60[i] != null && (H.c[i] > I.ma60[i]) === above60 && rb(I.rsi[i]) === rb(r)) idx.push(i);
+    const pick = []; idx.forEach(i => { if (!pick.length || i - pick[pick.length - 1] >= 5) pick.push(i); });
+    const bt = backtest(H.c, pick, 20);
+    const tone = (above60 ? 1 : -1) + (above250 === null ? 0 : above250 ? 1 : -1);
+    const head = tone >= 2 ? '走势强' : tone <= -2 ? '走势弱' : '走势分化';
+    return { head, trend, where, mood, bt, tone };
+  }
+
+  return { all, signals, backtest, state, levels, beta, ret, vol, earnReact, peHistory, plain };
 })();

@@ -197,3 +197,6 @@ body{margin:0}
 .verify summary{cursor:pointer}
 .verify.bad summary{color:var(--warn);font-weight:600}
 .verify ul{margin:6px 0 0;padding-left:16px}
+.plain{border-left:3px solid var(--muted)}
+.plain.up{border-left-color:var(--up)} .plain.down{border-left-color:var(--down)}
+.plain p{margin:6px 0 0}

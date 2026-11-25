@@ -196,6 +196,18 @@ function anaBox(a, price){
     <div class="ana-lbl num"><span>买入 ${a.buy}</span><span>持有 ${a.hold}</span><span>卖出 ${a.sell}</span></div>
     ${a.target ? `<p class="num">平均目标价 ${usd(a.target)}，比现价 ${pct((a.target/price-1)*100)}${a.lo&&a.hi?`（最低 ${usd(a.lo)}，最高 ${usd(a.hi)}）`:''}</p>` : ''}</div>`;
 }
+function plainBox(H, I){
+  const S = TA.state(H, I), P = TA.plain(H, I, S), b = P.bt, v = TA.vol(H, 252);
+  const col = P.tone >= 2 ? 'up' : P.tone <= -2 ? 'down' : '';
+  const hist = b.done >= 8
+    ? `过去两年出现类似状态 ${b.done} 次，之后 20 个交易日上涨的占 ${b.win.toFixed(0)}%，平均 ${pct(b.avg)}，最差 ${pct(b.worst)}。${b.win >= 40 && b.win <= 60 ? '接近一半一半，说明光看图判断不了接下来涨还是跌。' : b.win > 60 ? '偏向上涨，但样本有限，不代表这次也一样。' : '偏向下跌，但样本有限，不代表这次也一样。'}`
+    : '过去两年类似状态出现次数太少，没有可参考的统计。';
+  return `<div class="explain plain ${col}"><h3>白话解读：${P.head}</h3>
+    <p>${P.trend}；${P.where}；${P.mood}。</p>
+    <p>波动程度：一年里价格的正常起伏大约 ±${v.toFixed(0)}%${v > 50 ? '，属于波动很大的股票' : v < 25 ? '，属于比较稳的股票' : ''}。</p>
+    <p class="sub">${hist}</p>
+    <p class="sub">图表只描述现在的状态，不能预测涨跌。是否买卖，更该看公司本身（"历史""同业"标签）和你自己能承受多大的亏损（"价位"页计算器）。</p></div>`;
+}
 function techCard(H, I){
   const S = TA.state(H, I), mark = g => g === true ? '<span class="dot up"></span>' : g === false ? '<span class="dot down"></span>' : '<span class="dot"></span>';
   return `<div class="explain"><h3>技术面状态</h3>
@@ -208,7 +220,7 @@ function techCard(H, I){
 function fillOverviewAsync(my){
   getHist(CUR.t).then(H => {
     if (CUR !== my) return;
-    const I = TA.all(H), slot = $('#tech-slot'); if (slot) slot.innerHTML = techCard(H, I);
+    const I = TA.all(H), slot = $('#tech-slot'); if (slot) slot.innerHTML = plainBox(H, I) + techCard(H, I);
     const hs = $('#hsrc'); if (hs) hs.textContent = H.src;
     if (my.kind === 'h') {
       // 两个数据源核对收盘价
@@ -238,7 +250,7 @@ let RANGE = 252;
 function zoomStart(n){ return Math.max(0, (1 - RANGE / n) * 100); }
 function tabChart(body, H){
   const I = TA.all(H), E = TA.signals(H, I), P = palette(), L = TA.levels(H, I), n = H.c.length;
-  body.innerHTML = `
+  body.innerHTML = plainBox(H, I) + `
     <div class="seg" role="group" aria-label="时间范围">${[[126,'半年'],[252,'一年'],[504,'两年']].map(([k,l]) => `<button data-range="${k}" aria-pressed="${k===RANGE}">${l}</button>`).join('')}</div>
     <div class="sec mute">① K 线 + 均线</div>
     <div class="card chart-card"><div class="chart" id="c1" style="height:360px"></div></div>
